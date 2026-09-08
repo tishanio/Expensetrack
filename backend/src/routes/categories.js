@@ -62,6 +62,56 @@ const DEFAULT_CATEGORIES = [
     items: ["Pen", "Pencil", "Notebook", "Paper", "Printer Ink", "Files", "Other"],
   },
   {
+    name: "Personal Care",
+    icon: "💆",
+    items: ["Salon", "Skincare", "Haircare", "Cosmetics", "Laundry", "Other"],
+  },
+  {
+    name: "Pets",
+    icon: "🐾",
+    items: ["Pet Food", "Vet Visit", "Grooming", "Pet Supplies", "Other"],
+  },
+  {
+    name: "Fitness",
+    icon: "🏋️",
+    items: ["Gym Membership", "Sports Gear", "Yoga", "Trainer", "Other"],
+  },
+  {
+    name: "Subscriptions",
+    icon: "🔁",
+    items: ["Streaming", "Music", "Cloud Storage", "Software", "News", "Other"],
+  },
+  {
+    name: "Technology",
+    icon: "💻",
+    items: ["Laptop", "Phone", "Accessories", "Repairs", "Apps", "Other"],
+  },
+  {
+    name: "Finance",
+    icon: "💳",
+    items: ["Bank Fees", "Investment", "Loan Payment", "Credit Card", "Taxes", "Other"],
+  },
+  {
+    name: "Insurance",
+    icon: "🛡️",
+    items: ["Health Insurance", "Vehicle Insurance", "Life Insurance", "Travel Insurance", "Other"],
+  },
+  {
+    name: "Family",
+    icon: "👨‍👩‍👧‍👦",
+    items: ["Childcare", "School Fees", "Family Support", "Baby Supplies", "Other"],
+  },
+  {
+    name: "Work",
+    icon: "💼",
+    items: ["Commute", "Client Meeting", "Work Supplies", "Professional Fees", "Other"],
+  },
+  {
+    name: "Gifts & Donations",
+    icon: "🎁",
+    items: ["Birthday", "Wedding", "Charity", "Religious Giving", "Other"],
+  },
+  {
     name: "Others",
     icon: "📦",
     items: ["Miscellaneous", "Other"],
@@ -73,15 +123,24 @@ const DEFAULT_CATEGORIES = [
  */
 export async function seedDefaultCategories() {
   const col = getCategories();
-  const count = await col.countDocuments();
-  if (count === 0) {
-    const docs = DEFAULT_CATEGORIES.map((c) => ({
-      ...c,
-      isDefault: true,
-      created_at: new Date().toISOString(),
-    }));
-    await col.insertMany(docs);
-    console.log(`Seeded ${docs.length} default categories.`);
+  const now = new Date().toISOString();
+  const operations = DEFAULT_CATEGORIES.map((category) => ({
+    updateOne: {
+      filter: { name: category.name },
+      update: {
+        $setOnInsert: {
+          ...category,
+          isDefault: true,
+          created_at: now,
+        },
+      },
+      upsert: true,
+    },
+  }));
+
+  const result = await col.bulkWrite(operations, { ordered: false });
+  if (result.upsertedCount > 0) {
+    console.log(`Seeded ${result.upsertedCount} default categories.`);
   }
 }
 

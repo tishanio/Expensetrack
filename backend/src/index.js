@@ -5,12 +5,14 @@ import { seedDefaultCategories } from "./routes/categories.js";
 import expensesRouter from "./routes/expenses.js";
 import categoriesRouter from "./routes/categories.js";
 import ocrRouter from "./routes/ocr.js";
+import { seedDemoExpenses } from "./services/demoDataService.js";
 
 const PORT = process.env.PORT || 3001;
 
 async function main() {
   await connectDb();
   await seedDefaultCategories();
+  await seedDemoExpenses();
 
   const app = express();
   app.use(cors());

@@ -17,7 +17,7 @@ A full-stack web application for tracking personal expenses with OCR receipt sca
 
 - **Frontend:** React 18, Vite, TailwindCSS, Recharts, React Router, React Hot Toast
 - **Backend:** Node.js, Express
-- **Database:** MongoDB (via Docker)
+- **Database:** MongoDB
 - **OCR:** Tesseract.js v5 (client-to-server pipeline)
 
 ## Project Structure
@@ -59,12 +59,17 @@ expense-snap/
 
 - **Node.js** v18+ (tested with v24)
 - **npm** v9+
-- **Docker** (for MongoDB)
+- **MongoDB Community Server** installed locally, or a MongoDB Atlas connection string
 
 ### 1. Start MongoDB
 
-```bash
-docker run -d --name expensesnap-mongo -p 27017:27017 -v expensesnap-mongo-data:/data/db mongo:7
+On Windows, start the **MongoDB Server** service. On macOS/Linux, start your local `mongod` service. A hosted MongoDB connection can also be used through `MONGO_URI`.
+
+The backend automatically creates the default categories and adds demo expenses when the database has no expenses yet. Demo records use `source: "demo"` and are only inserted once.
+
+```powershell
+# Optional local health check
+mongosh "mongodb://localhost:27017/expensesnap" --eval "db.runCommand({ ping: 1 })"
 ```
 
 ### 2. Install Dependencies
@@ -86,7 +91,7 @@ cd backend
 npm run dev
 ```
 
-The server starts on `http://localhost:3001` and connects to MongoDB at `mongodb://localhost:27017/expensesnap`.
+The server starts on `http://localhost:3001` and connects to MongoDB at `mongodb://localhost:27017/expensesnap` by default.
 
 ### 4. Start the Frontend
 
