@@ -1,13 +1,18 @@
 const API_BASE = "/api";
 
 async function request(url, options = {}) {
-  const res = await fetch(`${API_BASE}${url}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-    ...options,
-  });
+  let res;
+  try {
+    res = await fetch(`${API_BASE}${url}`, {
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+      ...options,
+    });
+  } catch {
+    throw new Error("Backend unavailable. Start MongoDB and run the backend on port 3001.");
+  }
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: "Request failed" }));

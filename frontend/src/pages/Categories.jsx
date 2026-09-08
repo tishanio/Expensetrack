@@ -14,14 +14,18 @@ export default function Categories() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: "", icon: "📦", items: "" });
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState("");
 
   const loadCategories = async () => {
     setLoading(true);
+    setLoadError("");
     try {
       const data = await fetchCategories();
       setCategories(data);
     } catch (err) {
-      toast.error("Failed to load categories");
+      const message = err.message || "Failed to load categories";
+      setLoadError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -192,6 +196,15 @@ export default function Categories() {
             </svg>
             Loading categories...
           </div>
+        </div>
+      ) : loadError ? (
+        <div className="card p-12 text-center">
+          <div className="text-4xl mb-3">⚠️</div>
+          <p className="text-gray-700 font-medium">Could not load categories</p>
+          <p className="text-sm text-gray-500 mt-1">{loadError}</p>
+          <button type="button" onClick={loadCategories} className="btn-primary mt-4">
+            Retry
+          </button>
         </div>
       ) : categories.length === 0 ? (
         <div className="card p-12 text-center">
