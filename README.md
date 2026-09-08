@@ -1,4 +1,4 @@
-# 📸 ExpenseSnap — Smart Expense Tracker
+# 📸 Expensetrack — Smart Expense Tracker
 
 A full-stack web application for tracking personal expenses with OCR receipt scanning, auto-categorization, and analytics dashboards.
 
