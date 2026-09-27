@@ -276,7 +276,7 @@ export default function ReceiptUpload() {
         </>
       )}
 
-      <p className="tiny-note">Prototype note: OCR is simulated with sample receipts — no upload leaves your browser.</p>
+      <p className="tiny-note">Tip: receipts with a clear printed TOTAL line scan best.</p>
     </div>
   );
 }

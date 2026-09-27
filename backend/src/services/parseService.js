@@ -5,7 +5,7 @@
 
 const CURRENCY_SYMBOLS = /[\$\u00A3\u20B9\u20AC\u00A5]/;
 const AMOUNT_KEYWORDS =
-  /(?:total|amount|paid|grand\s*total|net\s*amount|bill\s*amount|sum|subtotal|due|balance|paid\s*amount)\s*[:\-]?\s*/i;
+  /(?:t[O0]t[A4]l|amount|p[A4][I1]d|net\s*amount|bill\s*amount|sum|sub\s*total|due|balance|paid\s*amount)\s*[:\-]?\s*/i;
 const DATE_PATTERNS = [
   // DD/MM/YYYY or DD-MM-YYYY
   /\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/,
@@ -48,31 +48,60 @@ const MONTH_MAP = {
 function extractAmount(text) {
   const lines = text.split("\n");
 
-  // Strategy 1: Look for lines with amount keywords
+  const symbol = /(?:[\$\u00A3\u20B9\u20AC\u00A5]|\bRs\.?|\bINR)?\s*/i.source;
+  const number = /(\d+(?:,\d{2,3})*(?:[.,]\d{1,2})?)/.source;
+
+  /** Parse a number token, treating "," as a decimal point only when it
+   *  cannot be Indian/Western grouping (i.e. it does not follow 2–3 digits
+   *  that are themselves part of the number). */
+  const parseNumberToken = (raw) => {
+    let cleaned;
+    if (/^\d{1,2}(,\d{2})$/.test(raw)) {
+      // exactly "12,34" style: single comma after 1-2 digits followed by
+      // exactly 2 digits — decimal comma (₹12,50), not grouping
+      cleaned = raw.replace(",", ".");
+    } else {
+      cleaned = raw.replace(/,/g, "");
+    }
+    const amount = parseFloat(cleaned);
+    return !isNaN(amount) && amount > 0 ? amount : null;
+  };
+
+  const numberAfter = (afterKeyword) => {
+    const numMatch = afterKeyword.match(new RegExp(symbol + number, "i"));
+    if (numMatch) return parseNumberToken(numMatch[1]);
+    return null;
+  };
+
+  // Strategy 1a: lines with a grand/total keyword, skipping subtotals —
+  // a TOTAL line must win even when Subtotal appears above it
+  for (const line of lines) {
+    if (/total/i.test(line) && !/sub\s*total/i.test(line)) {
+      const match = line.match(AMOUNT_KEYWORDS);
+      if (match) {
+        const found = numberAfter(line.slice(match.index + match[0].length));
+        if (found != null) return found;
+      }
+    }
+  }
+
+  // Strategy 1b: any other amount-keyword line (subtotal, due, balance...)
   for (const line of lines) {
     const match = line.match(AMOUNT_KEYWORDS);
     if (match) {
-      const afterKeyword = line.slice(match.index + match[0].length);
-      const numMatch = afterKeyword.match(
-        /[\$\u00A3\u20B9\u20AC\u00A5]?\s*(\d{1,3}(?:[,\.]\d{3})*(?:[.,]\d{1,2})?)/
-      );
-      if (numMatch) {
-        const cleaned = numMatch[1].replace(/,/g, "");
-        const amount = parseFloat(cleaned);
-        if (!isNaN(amount) && amount > 0) return amount;
-      }
+      const found = numberAfter(line.slice(match.index + match[0].length));
+      if (found != null) return found;
     }
   }
 
   // Strategy 2: Find the largest currency amount in the text
   const allAmounts = [];
   const amountRegex =
-    /[\$\u00A3\u20B9\u20AC\u00A5]\s*(\d{1,3}(?:[,\.]\d{3})*(?:[.,]\d{1,2})?)/g;
+    /(?:[\$\u00A3\u20B9\u20AC\u00A5]|\bRs\.?|\bINR)\s*(\d+(?:,\d{2,3})*(?:[.,]\d{1,2})?)/gi;
   let m;
   while ((m = amountRegex.exec(text)) !== null) {
-    const cleaned = m[1].replace(/,/g, "");
-    const amount = parseFloat(cleaned);
-    if (!isNaN(amount) && amount > 0) allAmounts.push(amount);
+    const amount = parseNumberToken(m[1]);
+    if (amount != null) allAmounts.push(amount);
   }
 
   // Also look for plain numbers that could be amounts (on their own line or after =)
