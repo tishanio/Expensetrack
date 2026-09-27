@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import toast from "react-hot-toast";
+import { toast } from "../sounds.js";
 import { extractOcr, createExpense, fetchCategories } from "../api.js";
 import { today } from "../constants.js";
+import { ScreenHead } from "../components/retro.jsx";
 
 export default function ReceiptUpload() {
   const navigate = useNavigate();
@@ -21,6 +22,7 @@ export default function ReceiptUpload() {
   });
   const [rawText, setRawText] = useState("");
   const [showRawText, setShowRawText] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
 
   useEffect(() => {
     fetchCategories()
@@ -46,12 +48,15 @@ export default function ReceiptUpload() {
 
   const handleDrop = (e) => {
     e.preventDefault();
+    setDragOver(false);
     const file = e.dataTransfer.files?.[0];
     if (file && file.type.startsWith("image/")) {
-      const dt = new DataTransfer();
-      dt.items.add(file);
-      if (fileInputRef.current) fileInputRef.current.files = dt.files;
-      handleFileSelect({ target: { files: [file] } });
+      const reader = new FileReader();
+      reader.onload = (ev) => setPreview(ev.target.result);
+      reader.readAsDataURL(file);
+      processImage(file);
+    } else {
+      toast.error("Please drop an image file");
     }
   };
 
@@ -77,6 +82,8 @@ export default function ReceiptUpload() {
     } catch (err) {
       toast.error(err.message || "Failed to process receipt");
       setStep("upload");
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -115,35 +122,32 @@ export default function ReceiptUpload() {
   };
 
   return (
-    <div className="max-w-lg mx-auto space-y-6">
-      <h2 className="text-2xl font-bold text-gray-900">Scan Receipt</h2>
+    <div>
+      <ScreenHead title="Scan Receipt" sub="Snap a bill. We guess the numbers — then you fix them." />
 
       {step === "upload" && (
-        <div
-          className="card p-8 border-2 border-dashed border-gray-300 hover:border-brand-400 transition-colors cursor-pointer text-center relative"
-          onClick={() => fileInputRef.current?.click()}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={handleDrop}
-        >
-          <div className="space-y-3">
-            <div className="text-5xl">📸</div>
-            <div>
-              <p className="text-lg font-medium text-gray-700">Upload a receipt or payment screenshot</p>
-              <p className="text-sm text-gray-500 mt-1">JPEG, PNG, WebP, or GIF — up to 10MB</p>
-            </div>
-            <button
-              className="btn-primary"
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); fileInputRef.current?.click(); }}
-            >
-              Choose File
-            </button>
+        <div className="card">
+          <div
+            className={"dropzone" + (dragOver ? " is-over" : "")}
+            role="button"
+            tabIndex={0}
+            aria-label="Upload a receipt image"
+            onClick={() => fileInputRef.current?.click()}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInputRef.current?.click(); } }}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handleDrop}
+          >
+            <span className="dropzone__emoji" aria-hidden="true">📸</span>
+            <span className="dropzone__head">Drop a receipt here</span>
+            <p className="screen-sub" style={{ margin: "8px 0 16px" }}>JPEG, PNG, WebP or GIF — up to 10MB</p>
+            <span className="btn btn--cyan">Choose File</span>
           </div>
           <input
             ref={fileInputRef}
             type="file"
             accept="image/jpeg,image/png,image/webp,image/gif"
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-            style={{ position: "absolute", top: 0, left: 0 }}
+            className="sr-only"
             onChange={handleFileSelect}
           />
         </div>
@@ -152,120 +156,127 @@ export default function ReceiptUpload() {
       {(step === "review" || step === "saving") && (
         <>
           {preview && (
-            <div className="card overflow-hidden">
-              <img src={preview} alt="Receipt preview" className="w-full max-h-64 object-contain bg-gray-50" />
+            <div className="card receipt-frame">
+              <img className="od-media" src={preview} alt="Receipt preview" />
             </div>
           )}
 
           {!ocrResult && (
-            <div className="card p-8 text-center">
-              <div className="flex flex-col items-center gap-3">
-                <svg className="animate-spin h-8 w-8 text-brand-600" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                <p className="text-gray-600 font-medium">Processing receipt with OCR...</p>
-                <p className="text-sm text-gray-400">This may take a few seconds</p>
-              </div>
+            <div className="card" style={{ textAlign: "center" }}>
+              <div className="spinner" role="status" aria-label="Processing receipt" />
+              <p className="screen-sub" style={{ marginTop: 14 }}>Processing receipt with OCR...</p>
             </div>
           )}
 
           {ocrResult && (
-            <div className="card p-6 space-y-5">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Extracted Details</h3>
-                <span className={`text-xs px-2 py-1 rounded-full font-medium ${ocrResult.confidence === "good" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
-                  {ocrResult.confidence === "good" ? "✓ High confidence" : "⚠ Low confidence — verify below"}
+            <div className="card">
+              <div className="od-row" style={{ justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap" }}>
+                <h3 className="card__title" style={{ margin: 0 }}>Extracted Details</h3>
+                <span className={"tag" + (ocrResult.confidence === "good" ? "" : " tag--ocr")}>
+                  {ocrResult.confidence === "good" ? "✓ High confidence" : "⚠ Low — please verify"}
                 </span>
               </div>
 
-              <div>
-                <label className="label">Amount (₹)</label>
-                <input type="number" className="input" step="0.01" min="0" value={form.amount} onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))} placeholder="Enter amount" />
-              </div>
-
-              <div>
-                <label className="label">Description / Merchant</label>
-                <input type="text" className="input" value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} placeholder="Merchant or item name" />
-              </div>
-
-              <div>
-                <label className="label">Category</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {categories.map((cat) => (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() => setForm((p) => ({ ...p, category: cat.name, itemType: "" }))}
-                      className={`px-3 py-2 rounded-lg text-sm font-medium border transition-all ${
-                        form.category === cat.name
-                          ? "bg-brand-50 border-brand-500 text-brand-700 ring-2 ring-brand-500/20"
-                          : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
-                      }`}
-                    >
-                      {cat.icon} {cat.name}
-                    </button>
-                  ))}
+              <div className="od-stack" style={{ "--od-gap": "16px" }}>
+                <div className="od-field">
+                  <label className="field-label" htmlFor="scanAmount">Amount (₹) <span aria-hidden="true">*</span></label>
+                  <input
+                    id="scanAmount"
+                    className="input"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.amount}
+                    onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))}
+                    placeholder="Enter amount"
+                  />
                 </div>
-              </div>
 
-              {selectedCatItems.length > 0 && (
-                <div>
-                  <label className="label">Item Type</label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {selectedCatItems.map((item) => (
+                <div className="od-field">
+                  <label className="field-label" htmlFor="scanDesc">Merchant / Description</label>
+                  <input
+                    id="scanDesc"
+                    className="input"
+                    type="text"
+                    value={form.description}
+                    onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
+                    placeholder="Merchant or item name"
+                  />
+                </div>
+
+                <div className="od-field">
+                  <span className="field-label">Category</span>
+                  <div className="od-cluster" style={{ "--od-gap": "8px" }}>
+                    {categories.map((cat) => (
                       <button
-                        key={item}
+                        key={cat.id}
                         type="button"
-                        onClick={() => setForm((p) => ({ ...p, itemType: item }))}
-                        className={`text-xs px-2.5 py-1.5 rounded-full border transition-all ${
-                          form.itemType === item
-                            ? "bg-brand-50 border-brand-500 text-brand-700"
-                            : "bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300"
-                        }`}
+                        className={"chip chip--icon" + (form.category === cat.name ? " is-on" : "")}
+                        aria-pressed={form.category === cat.name}
+                        onClick={() => setForm((p) => ({ ...p, category: cat.name, itemType: "" }))}
                       >
-                        {item}
+                        {cat.icon} {cat.name}
                       </button>
                     ))}
                   </div>
                 </div>
-              )}
 
-              <div>
-                <label className="label">Date</label>
-                <input type="date" className="input" value={form.date} onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))} />
-              </div>
-
-              <div>
-                <button type="button" onClick={() => setShowRawText(!showRawText)} className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">
-                  <span className={`transition-transform ${showRawText ? "rotate-90" : ""}`}>▶</span>
-                  Raw OCR Text (for debugging)
-                </button>
-                {showRawText && (
-                  <pre className="mt-2 p-3 bg-gray-50 rounded-lg text-xs text-gray-600 overflow-auto max-h-40 whitespace-pre-wrap">
-                    {rawText || "(empty)"}
-                  </pre>
+                {selectedCatItems.length > 0 && (
+                  <div className="od-field">
+                    <span className="field-label">Item Type</span>
+                    <div className="od-cluster" style={{ "--od-gap": "6px" }}>
+                      {selectedCatItems.map((item) => (
+                        <button
+                          key={item}
+                          type="button"
+                          className={"chip chip--sm" + (form.itemType === item ? " is-on" : "")}
+                          onClick={() => setForm((p) => ({ ...p, itemType: item }))}
+                        >
+                          {item}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 )}
-              </div>
 
-              <div className="flex gap-3">
-                <button onClick={handleSave} disabled={step === "saving"} className="btn-primary flex-1">
-                  {step === "saving" ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                      </svg>
-                      Saving...
-                    </span>
-                  ) : "Save Expense"}
-                </button>
-                <button onClick={handleReset} className="btn-secondary">Start Over</button>
+                <div className="od-field">
+                  <label className="field-label" htmlFor="scanDate">Date</label>
+                  <input
+                    id="scanDate"
+                    className="input"
+                    type="date"
+                    value={form.date}
+                    onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))}
+                  />
+                </div>
+
+                <div>
+                  <button type="button" className="btn btn--ghost btn--sm" aria-expanded={showRawText} onClick={() => setShowRawText(!showRawText)}>
+                    {showRawText ? "▾" : "▸"} Raw OCR Text
+                  </button>
+                  {showRawText && (
+                    <pre className="raw">{rawText || "(empty)"}</pre>
+                  )}
+                </div>
+
+                <div className="od-row" style={{ "--od-gap": "12px", flexWrap: "wrap" }}>
+                  <button onClick={handleSave} disabled={step === "saving"} className="btn btn--green" style={{ flex: "1 1 200px" }}>
+                    {step === "saving" ? (
+                      <>
+                        <span className="spinner" style={{ width: 22, height: 22, borderWidth: 4, margin: 0 }} aria-hidden="true" />
+                        Saving...
+                      </>
+                    ) : "Save Expense"}
+                  </button>
+                  <button onClick={handleReset} className="btn btn--ghost">Start Over</button>
+                </div>
               </div>
             </div>
           )}
         </>
       )}
+
+      <p className="tiny-note">Prototype note: OCR is simulated with sample receipts — no upload leaves your browser.</p>
     </div>
   );
 }

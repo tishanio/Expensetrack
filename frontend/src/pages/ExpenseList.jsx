@@ -1,16 +1,13 @@
 import { useState, useEffect } from "react";
-import toast from "react-hot-toast";
+import { toast } from "../sounds.js";
 import {
   fetchExpenses,
   updateExpense,
   deleteExpense,
   fetchCategories,
 } from "../api.js";
-import {
-  formatCurrency,
-  formatDate,
-  CATEGORY_ICONS,
-} from "../constants.js";
+import { formatCurrency, formatDate } from "../constants.js";
+import { ScreenHead, EmptyState, Loading, catColor, catIcon } from "../components/retro.jsx";
 
 export default function ExpenseList() {
   const [expenses, setExpenses] = useState([]);
@@ -147,212 +144,173 @@ export default function ExpenseList() {
     categories.find((c) => c.name === editForm.category)?.items || [];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">All Expenses</h2>
-        <span className="text-sm text-gray-500">
-          {expenses.length} expense{expenses.length !== 1 ? "s" : ""}
-        </span>
-      </div>
+    <div>
+      <ScreenHead
+        title="All Expenses"
+        extra={
+          <span className="tag" style={{ fontSize: 14, padding: "6px 12px" }}>
+            {expenses.length} expense{expenses.length !== 1 ? "s" : ""}
+          </span>
+        }
+      />
 
       {/* Filters */}
-      <div className="card p-4">
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 items-end">
-          <div>
-            <label className="label">Category</label>
-            <select
-              className="input"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-            >
+      <div className="card card--flat">
+        <div className="od-grid filter-grid">
+          <div className="od-field">
+            <label className="field-label" htmlFor="fCat">Category</label>
+            <select id="fCat" className="input" value={category} onChange={(e) => setCategory(e.target.value)}>
               <option value="">All Categories</option>
               {categories.map((c) => (
-                <option key={c.id} value={c.name}>
-                  {c.icon} {c.name}
-                </option>
+                <option key={c.id} value={c.name}>{c.icon} {c.name}</option>
               ))}
             </select>
           </div>
-          <div>
-            <label className="label">From</label>
-            <input
-              type="date"
-              className="input"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-            />
+          <div className="od-field">
+            <label className="field-label" htmlFor="fStart">From</label>
+            <input id="fStart" className="input" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
           </div>
-          <div>
-            <label className="label">To</label>
-            <input
-              type="date"
-              className="input"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-            />
+          <div className="od-field">
+            <label className="field-label" htmlFor="fEnd">To</label>
+            <input id="fEnd" className="input" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
           </div>
-          <div>
-            <label className="label">Source</label>
-            <select
-              className="input"
-              value={source}
-              onChange={(e) => setSource(e.target.value)}
-            >
+          <div className="od-field">
+            <label className="field-label" htmlFor="fSource">Source</label>
+            <select id="fSource" className="input" value={source} onChange={(e) => setSource(e.target.value)}>
               <option value="">All Sources</option>
               <option value="manual">Manual</option>
               <option value="ocr">OCR</option>
             </select>
           </div>
-          <div>
-            <label className="label">Sort By</label>
-            <div className="flex gap-1">
-              <select
-                className="input flex-1"
-                value={sort}
-                onChange={(e) => setSort(e.target.value)}
-              >
+          <div className="od-field">
+            <label className="field-label" htmlFor="fSort">Sort By</label>
+            <div className="od-row" style={{ "--od-gap": "8px" }}>
+              <select id="fSort" className="input od-fill" value={sort} onChange={(e) => setSort(e.target.value)}>
                 <option value="date">Date</option>
                 <option value="amount">Amount</option>
                 <option value="created_at">Created</option>
               </select>
               <button
+                type="button"
+                className="icon-btn"
                 onClick={() => setOrder((p) => (p === "asc" ? "desc" : "asc"))}
-                className="btn-secondary px-2"
+                aria-label="Toggle sort direction"
                 title={`Currently ${order === "asc" ? "ascending" : "descending"}`}
               >
                 {order === "asc" ? "↑" : "↓"}
               </button>
             </div>
           </div>
+          {hasFilters && (
+            <div className="od-field" style={{ alignSelf: "end" }}>
+              <button type="button" className="btn btn--ghost btn--block btn--sm" onClick={clearFilters}>
+                Clear all filters
+              </button>
+            </div>
+          )}
         </div>
-        {hasFilters && (
-          <button
-            onClick={clearFilters}
-            className="mt-3 text-sm text-brand-600 hover:text-brand-700 font-medium"
-          >
-            Clear all filters
-          </button>
-        )}
       </div>
 
-      {/* Expense List */}
+      {/* Expense list */}
       {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="text-gray-500 flex items-center gap-2">
-            <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            Loading expenses...
-          </div>
+        <div style={{ marginTop: 20 }}>
+          <Loading label="Loading expenses..." />
         </div>
       ) : expenses.length === 0 ? (
-        <div className="card p-12 text-center">
-          <div className="text-4xl mb-3">📭</div>
-          <p className="text-gray-500 font-medium">No expenses found</p>
-          <p className="text-sm text-gray-400 mt-1">
-            {hasFilters ? "Try adjusting your filters" : "Add your first expense to get started!"}
-          </p>
+        <div style={{ marginTop: 20 }}>
+          <EmptyState
+            emoji="📭"
+            title="No expenses found"
+            text={hasFilters ? "Try adjusting your filters." : "Add your first expense to get started!"}
+          />
         </div>
       ) : (
-        <div className="card divide-y divide-gray-100 overflow-hidden">
-          {expenses.map((expense) => {
+        <div className="list" style={{ marginTop: 20 }}>
+          {expenses.map((expense, i) => {
             const isEditing = editingId === expense.id;
 
-            return (
-              <div
-                key={expense.id}
-                className={`px-4 sm:px-6 py-4 transition-colors ${
-                  isEditing ? "bg-brand-50/50" : "hover:bg-gray-50"
-                }`}
-              >
-                {isEditing ? (
-                  /* ── Inline Edit Form ── */
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                      <div>
-                        <label className="label text-xs">Amount (₹)</label>
-                        <input type="number" name="amount" className="input text-sm" step="0.01" min="0" value={editForm.amount} onChange={handleEditChange} />
-                      </div>
-                      <div>
-                        <label className="label text-xs">Category</label>
-                        <select name="category" className="input text-sm" value={editForm.category} onChange={handleEditChange}>
-                          {categories.map((c) => (
-                            <option key={c.id} value={c.name}>{c.icon} {c.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="label text-xs">Item Type</label>
-                        <select name="itemType" className="input text-sm" value={editForm.itemType} onChange={handleEditChange}>
-                          <option value="">Select item...</option>
-                          {editCatItems.map((item) => (
-                            <option key={item} value={item}>{item}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="label text-xs">Date</label>
-                        <input type="date" name="date" className="input text-sm" value={editForm.date} onChange={handleEditChange} />
-                      </div>
-                      <div>
-                        <label className="label text-xs">Description</label>
-                        <input type="text" name="description" className="input text-sm" value={editForm.description} onChange={handleEditChange} />
-                      </div>
+            if (isEditing) {
+              return (
+                <div className="list__row" key={expense.id} style={{ background: "var(--canvas)", flexWrap: "wrap", animation: "none" }}>
+                  <div className="od-grid edit-grid" style={{ width: "100%" }}>
+                    <div className="od-field">
+                      <label className="field-label" htmlFor="edAmt">Amount (₹)</label>
+                      <input id="edAmt" name="amount" className="input" type="number" step="0.01" min="0" value={editForm.amount} onChange={handleEditChange} />
                     </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => handleSave(expense.id)} disabled={saving} className="btn-primary text-xs px-3 py-1.5">
-                        {saving ? "Saving..." : "Save"}
-                      </button>
-                      <button onClick={cancelEditing} className="btn-secondary text-xs px-3 py-1.5" disabled={saving}>
-                        Cancel
-                      </button>
+                    <div className="od-field">
+                      <label className="field-label" htmlFor="edCat">Category</label>
+                      <select id="edCat" name="category" className="input" value={editForm.category} onChange={handleEditChange}>
+                        {categories.map((c) => (
+                          <option key={c.id} value={c.name}>{c.icon} {c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="od-field">
+                      <label className="field-label" htmlFor="edItem">Item Type</label>
+                      <select id="edItem" name="itemType" className="input" value={editForm.itemType} onChange={handleEditChange}>
+                        <option value="">Select item…</option>
+                        {editCatItems.map((item) => (
+                          <option key={item} value={item}>{item}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="od-field">
+                      <label className="field-label" htmlFor="edDate">Date</label>
+                      <input id="edDate" name="date" className="input" type="date" value={editForm.date} onChange={handleEditChange} />
+                    </div>
+                    <div className="od-field">
+                      <label className="field-label" htmlFor="edDesc">Description</label>
+                      <input id="edDesc" name="description" className="input" type="text" value={editForm.description} onChange={handleEditChange} />
                     </div>
                   </div>
-                ) : (
-                  /* ── Normal View ── */
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="text-2xl flex-shrink-0">
-                        {CATEGORY_ICONS[expense.category] || "📦"}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="font-medium text-gray-900 truncate">
-                          {expense.item_type || expense.description || expense.category}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {formatDate(expense.date)}
-                          <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">
-                            {expense.category}
-                          </span>
-                          {expense.source === "ocr" && (
-                            <span className="ml-1 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">
-                              OCR
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                    </div>
+                  <div className="od-row" style={{ "--od-gap": "10px" }}>
+                    <button className="btn btn--green btn--sm" type="button" disabled={saving} onClick={() => handleSave(expense.id)}>
+                      {saving ? "Saving..." : "Save"}
+                    </button>
+                    <button className="btn btn--ghost btn--sm" type="button" disabled={saving} onClick={cancelEditing}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              );
+            }
 
-                    <div className="flex items-center gap-3">
-                      <div className="text-right">
-                        <p className="font-semibold text-gray-900">
-                          {formatCurrency(expense.amount)}
-                        </p>
-                      </div>
-                      <button onClick={() => startEditing(expense)} className="text-gray-400 hover:text-brand-600 transition-colors p-1" title="Edit">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                      </button>
-                      <button onClick={() => handleDelete(expense.id)} className="text-gray-400 hover:text-red-600 transition-colors p-1" title="Delete">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                )}
+            return (
+              <div className="list__row" key={expense.id} style={{ animationDelay: `${Math.min(i, 12) * 40}ms` }}>
+                <span className="row-icon" style={{ background: catColor(expense.category) + "33" }} aria-hidden="true">
+                  {catIcon(expense.category)}
+                </span>
+                <div className="row-main od-field">
+                  <span className="row-name od-truncate">
+                    {expense.item_type || expense.description || expense.category}
+                  </span>
+                  <span className="row-meta">
+                    <span className="tag">{expense.category}</span>
+                    {expense.source === "ocr" && <span className="tag tag--ocr">OCR</span>}
+                    <span className="screen-sub">{formatDate(expense.date)}</span>
+                  </span>
+                </div>
+                <span className="row-amt od-nowrap">{formatCurrency(expense.amount)}</span>
+                <button
+                  className="icon-btn"
+                  type="button"
+                  onClick={() => startEditing(expense)}
+                  aria-label={`Edit ${expense.item_type || expense.category}`}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5" /><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4z" />
+                  </svg>
+                </button>
+                <button
+                  className="icon-btn icon-btn--del"
+                  type="button"
+                  onClick={() => handleDelete(expense.id)}
+                  aria-label={`Delete ${expense.item_type || expense.category}`}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" />
+                  </svg>
+                </button>
               </div>
             );
           })}

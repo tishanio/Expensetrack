@@ -11,18 +11,15 @@ ReactDOM.createRoot(document.getElementById("root")).render(
       <App />
       <Toaster
         position="top-right"
+        containerStyle={{ top: 76 }}
         toastOptions={{
-          duration: 3000,
-          style: {
-            borderRadius: "12px",
-            padding: "12px 16px",
-            fontSize: "14px",
-          },
+          duration: 2600,
+          className: "toast-shell",
           success: {
-            iconTheme: { primary: "#16a34a", secondary: "#fff" },
+            iconTheme: { primary: "#00c875", secondary: "#fff" },
           },
           error: {
-            iconTheme: { primary: "#dc2626", secondary: "#fff" },
+            iconTheme: { primary: "#e01b3c", secondary: "#fff" },
           },
         }}
       />

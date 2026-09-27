@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import toast from "react-hot-toast";
+import { toast } from "../sounds.js";
 import { createExpense, fetchCategories, searchItems } from "../api.js";
 import { today } from "../constants.js";
+import { ScreenHead } from "../components/retro.jsx";
 
 export default function AddExpense() {
   const navigate = useNavigate();
@@ -31,7 +32,6 @@ export default function AddExpense() {
       .catch(() => {});
   }, []);
 
-  // Get items for selected category
   const selectedCat = categories.find((c) => c.name === form.category);
   const categoryItems = selectedCat?.items || [];
 
@@ -71,16 +71,10 @@ export default function AddExpense() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm((prev) => {
-      const next = { ...prev, [name]: value };
-      // Reset item type when category changes
-      if (name === "category") {
-        next.itemType = "";
-      }
-      return next;
-    });
+  const pickCategory = (name) => {
+    setForm((p) => ({ ...p, category: name, itemType: "" }));
+    setItemSuggestions([]);
+    setShowSuggestions(false);
   };
 
   const handleSubmit = async (e) => {
@@ -118,156 +112,156 @@ export default function AddExpense() {
   };
 
   return (
-    <div className="max-w-lg mx-auto">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">Add Expense</h2>
+    <div>
+      <ScreenHead title="Add Expense" sub="Smash the numbers in. Big buttons, no mistakes." />
 
-      <form onSubmit={handleSubmit} className="card p-6 space-y-5">
-        {/* Amount */}
-        <div>
-          <label className="label">Amount (₹)</label>
-          <input
-            type="number"
-            name="amount"
-            className="input"
-            placeholder="0.00"
-            step="0.01"
-            min="0"
-            value={form.amount}
-            onChange={handleChange}
-            required
-          />
-        </div>
-
-        {/* Category */}
-        <div>
-          <label className="label">Category</label>
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-            {categories.map((cat) => (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() =>
-                  setForm((p) => ({ ...p, category: cat.name, itemType: "" }))
-                }
-                className={`px-3 py-2 rounded-lg text-sm font-medium border transition-all ${
-                  form.category === cat.name
-                    ? "bg-brand-50 border-brand-500 text-brand-700 ring-2 ring-brand-500/20"
-                    : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
-                }`}
-              >
-                <span className="mr-1">{cat.icon}</span>
-                {cat.name}
-              </button>
-            ))}
+      <form onSubmit={handleSubmit} className="card" noValidate>
+        <div className="od-stack" style={{ "--od-gap": "18px" }}>
+          {/* Amount */}
+          <div className="od-field">
+            <label className="field-label" htmlFor="addAmount">Amount (₹) <span aria-hidden="true">*</span></label>
+            <input
+              id="addAmount"
+              className="input"
+              type="number"
+              inputMode="decimal"
+              min="0"
+              step="0.01"
+              placeholder="0.00"
+              value={form.amount}
+              onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))}
+              required
+            />
+            <span className="field-hint">Required. Must be more than zero.</span>
           </div>
-        </div>
 
-        {/* Item Type (with autocomplete) */}
-        <div ref={searchRef} className="relative">
-          <label className="label">Item Type</label>
-          <input
-            type="text"
-            className="input"
-            placeholder={
-              categoryItems.length > 0
-                ? `e.g. ${categoryItems.slice(0, 3).join(", ")}...`
-                : "Type an item name..."
-            }
-            value={form.itemType}
-            onChange={(e) => handleItemSearch(e.target.value)}
-            onFocus={() => {
-              if (itemSuggestions.length > 0) setShowSuggestions(true);
-            }}
-          />
-
-          {/* Quick-select chips from category items */}
-          {categoryItems.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-2">
-              {categoryItems.map((item) => (
+          {/* Category chips */}
+          <div className="od-field">
+            <span className="field-label">Category <span aria-hidden="true">*</span></span>
+            <div className="od-cluster" style={{ "--od-gap": "8px" }}>
+              {categories.map((cat) => (
                 <button
-                  key={item}
+                  key={cat.id}
                   type="button"
-                  onClick={() =>
-                    setForm((p) => ({ ...p, itemType: item }))
-                  }
-                  className={`text-xs px-2 py-1 rounded-full border transition-all ${
-                    form.itemType === item
-                      ? "bg-brand-50 border-brand-500 text-brand-700"
-                      : "bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300"
-                  }`}
+                  className={"chip chip--icon" + (form.category === cat.name ? " is-on" : "")}
+                  aria-pressed={form.category === cat.name}
+                  onClick={() => pickCategory(cat.name)}
                 >
-                  {item}
+                  {cat.icon} {cat.name}
                 </button>
               ))}
             </div>
-          )}
+          </div>
 
-          {/* Search suggestions dropdown */}
-          {showSuggestions && itemSuggestions.length > 0 && (
-            <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-auto">
-              {itemSuggestions.map((s, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm flex justify-between"
-                  onClick={() => {
-                    setForm((p) => ({ ...p, itemType: s.itemType }));
-                    setShowSuggestions(false);
-                  }}
-                >
-                  <span>
-                    <span className="font-medium">{s.itemType}</span>
-                    <span className="text-gray-400 ml-2">({s.category})</span>
-                  </span>
-                  <span className="text-gray-400">
-                    {s.count}x · ₹{s.totalAmount.toLocaleString("en-IN")}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
+          {/* Item Type (with autocomplete) */}
+          <div className="od-field" ref={searchRef} style={{ position: "relative" }}>
+            <label className="field-label" htmlFor="addItem">Item Type</label>
+            <input
+              id="addItem"
+              className="input"
+              type="text"
+              placeholder="e.g. Groceries, Uber, Movie..."
+              value={form.itemType}
+              onChange={(e) => handleItemSearch(e.target.value)}
+              onFocus={() => { if (itemSuggestions.length > 0) setShowSuggestions(true); }}
+              autoComplete="off"
+            />
+
+            {/* Quick-select chips from category items */}
+            {categoryItems.length > 0 && (
+              <div className="od-cluster" style={{ "--od-gap": "6px", marginTop: 10 }}>
+                {categoryItems.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    className={"chip chip--sm" + (form.itemType === item ? " is-on" : "")}
+                    onClick={() => setForm((p) => ({ ...p, itemType: item }))}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Search suggestions dropdown */}
+            {showSuggestions && itemSuggestions.length > 0 && (
+              <div
+                style={{
+                  position: "absolute", zIndex: 20, left: 0, right: 0, top: "100%",
+                  background: "var(--paper)", border: "3px solid var(--ink)",
+                  borderRadius: "var(--r)", boxShadow: "var(--shadow-sm)",
+                  maxHeight: 200, overflow: "auto", marginTop: 4,
+                }}
+              >
+                {itemSuggestions.map((s, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    style={{
+                      display: "flex", width: "100%", justifyContent: "space-between", gap: 8,
+                      padding: "10px 14px", background: "none", border: "none",
+                      borderBottom: "2px dashed #d9d9e6", cursor: "pointer",
+                      fontFamily: "var(--font-body)", fontSize: 15,
+                    }}
+                    onClick={() => {
+                      setForm((p) => ({ ...p, itemType: s.itemType }));
+                      setShowSuggestions(false);
+                    }}
+                  >
+                    <span style={{ fontWeight: 700 }}>
+                      {s.itemType}
+                      <span style={{ color: "var(--muted)", fontWeight: 500, marginLeft: 6 }}>({s.category})</span>
+                    </span>
+                    <span style={{ color: "var(--muted)", whiteSpace: "nowrap" }}>
+                      {s.count}x · ₹{s.totalAmount.toLocaleString("en-IN")}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Description */}
+          <div className="od-field">
+            <label className="field-label" htmlFor="addDesc">Description (optional)</label>
+            <input
+              id="addDesc"
+              className="input"
+              type="text"
+              placeholder="Any little notes..."
+              value={form.description}
+              onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
+            />
+          </div>
+
+          {/* Date */}
+          <div className="od-field">
+            <label className="field-label" htmlFor="addDate">Date <span aria-hidden="true">*</span></label>
+            <input
+              id="addDate"
+              className="input"
+              type="date"
+              value={form.date}
+              onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))}
+              required
+            />
+          </div>
+
+          {/* Submit */}
+          <button className="btn btn--pink btn--block" type="submit" disabled={saving}>
+            {saving ? (
+              <>
+                <span className="spinner" style={{ width: 22, height: 22, borderWidth: 4, margin: 0 }} aria-hidden="true" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+                Save Expense
+              </>
+            )}
+          </button>
         </div>
-
-        {/* Description */}
-        <div>
-          <label className="label">Description (optional)</label>
-          <input
-            type="text"
-            name="description"
-            className="input"
-            placeholder="Any additional notes..."
-            value={form.description}
-            onChange={handleChange}
-          />
-        </div>
-
-        {/* Date */}
-        <div>
-          <label className="label">Date</label>
-          <input
-            type="date"
-            name="date"
-            className="input"
-            value={form.date}
-            onChange={handleChange}
-            required
-          />
-        </div>
-
-        {/* Submit */}
-        <button type="submit" className="btn-primary w-full" disabled={saving}>
-          {saving ? (
-            <span className="flex items-center gap-2">
-              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              Saving...
-            </span>
-          ) : (
-            "Save Expense"
-          )}
-        </button>
       </form>
     </div>
   );

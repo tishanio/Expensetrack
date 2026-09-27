@@ -1,29 +1,31 @@
 import { useState, useEffect } from "react";
+import { fetchStats, fetchCategories } from "../api.js";
+import { formatCurrency, formatDate } from "../constants.js";
 import {
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from "recharts";
-import { fetchStats } from "../api.js";
-import {
-  formatCurrency,
-  CATEGORY_COLORS,
-  CATEGORY_ICONS,
-} from "../constants.js";
+  Donut, Bars, Legend, ScreenHead, EmptyState, Wave, Loading,
+  catColor, catIcon, fmtShort,
+} from "../components/retro.jsx";
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [categories, setCategories] = useState([]);
+
+  useEffect(() => {
+    fetchCategories().then(setCategories).catch(() => {});
+  }, []);
+
+  // Refresh when categories change (e.g. after a delete on Categories tab)
+  useEffect(() => {
+    const handler = () => {
+      fetchCategories().then(setCategories).catch(() => {});
+      loadStats();
+    };
+    window.addEventListener("categoriesChanged", handler);
+    return () => window.removeEventListener("categoriesChanged", handler);
+  }, []);
 
   const loadStats = async () => {
     setLoading(true);
@@ -44,243 +46,147 @@ export default function Dashboard() {
     loadStats();
   }, [startDate, endDate]);
 
-  if (loading && !stats) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="text-gray-500 flex items-center gap-2">
-          <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-              fill="none"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-            />
-          </svg>
-          Loading dashboard...
-        </div>
-      </div>
-    );
-  }
+  const activeCategoryNames = new Set(categories.map((c) => c.name));
+  const filteredBreakdown = stats?.categoryBreakdown?.filter(
+    (b) => activeCategoryNames.has(b.category)
+  ) || [];
+
+  const totalSpend = stats?.totalSpend || 0;
+  const thisMonth = new Date().toISOString().slice(0, 7);
+
+  const trend = (stats?.monthlyTrend || []).map((m) => {
+    const [y, mo] = String(m.month).split("-");
+    const label = new Date(y, mo - 1).toLocaleString("en", { month: "short", year: "2-digit" });
+    return { label, value: m.total };
+  });
+
+  const statCards = [
+    { label: "Total Spend", value: formatCurrency(totalSpend), icon: "💰", bg: "var(--yellow)" },
+    { label: "Transactions", value: String(stats?.totalCount || 0), icon: "🧾", bg: "var(--cyan)" },
+    { label: "This Month", value: formatCurrency(stats?.currentMonthTotal || 0), icon: "📅", bg: "var(--pink)" },
+    {
+      label: "Top Category",
+      value: stats?.topCategoryCurrentMonth || "N/A",
+      icon: stats?.topCategoryCurrentMonth ? catIcon(stats.topCategoryCurrentMonth) : "❓",
+      bg: "var(--green)",
+    },
+  ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
-      </div>
+    <div>
+      <ScreenHead title="Dashboard" sub="Where all the rupees went, in crayon." />
 
       {/* Filters */}
-      <div className="card p-4">
-        <div className="flex flex-wrap gap-4 items-end">
-          <div>
-            <label className="label">From</label>
-            <input
-              type="date"
-              className="input w-40"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-            />
+      <div className="card card--flat">
+        <span className="sticker" aria-hidden="true" style={{ display: "grid", placeItems: "center", fontSize: 24 }}>⭐</span>
+        <div className="od-grid filter-grid">
+          <div className="od-field">
+            <label className="field-label" htmlFor="dashStart">From</label>
+            <input id="dashStart" className="input" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
           </div>
-          <div>
-            <label className="label">To</label>
-            <input
-              type="date"
-              className="input w-40"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-            />
+          <div className="od-field">
+            <label className="field-label" htmlFor="dashEnd">To</label>
+            <input id="dashEnd" className="input" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
           </div>
           {(startDate || endDate) && (
-            <button
-              onClick={() => {
-                setStartDate("");
-                setEndDate("");
-              }}
-              className="btn-secondary"
-            >
-              Clear Filters
-            </button>
+            <div className="od-field" style={{ alignSelf: "end" }}>
+              <button
+                type="button"
+                className="btn btn--ghost btn--block"
+                onClick={() => { setStartDate(""); setEndDate(""); }}
+              >
+                Clear Filters
+              </button>
+            </div>
           )}
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          label="Total Spend"
-          value={formatCurrency(stats?.totalSpend || 0)}
-          icon="💰"
-          color="bg-brand-50 text-brand-700"
-        />
-        <StatCard
-          label="Transactions"
-          value={stats?.totalCount || 0}
-          icon="🧾"
-          color="bg-blue-50 text-blue-700"
-        />
-        <StatCard
-          label="This Month"
-          value={formatCurrency(stats?.currentMonthTotal || 0)}
-          icon="📅"
-          color="bg-purple-50 text-purple-700"
-        />
-        <StatCard
-          label="Top Category"
-          value={stats?.topCategoryCurrentMonth || "N/A"}
-          icon={CATEGORY_ICONS[stats?.topCategoryCurrentMonth] || "📦"}
-          color="bg-amber-50 text-amber-700"
-        />
+      {/* Stat cards */}
+      <div className="od-grid stat-grid" style={{ marginTop: 20 }}>
+        {statCards.map((s) => (
+          <div className="stat" key={s.label}>
+            <div className="stat__top">
+              <span className="stat__icon" style={{ background: s.bg }} aria-hidden="true">{s.icon}</span>
+              <div className="od-stat">
+                <span className="stat__num od-nowrap">{s.value}</span>
+                <span className="stat__lab">{s.label}</span>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Pie Chart - Category Breakdown */}
-        <div className="card p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            Category Breakdown
-          </h3>
-          {stats?.categoryBreakdown?.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={stats.categoryBreakdown}
-                  dataKey="total"
-                  nameKey="category"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={100}
-                  label={({ category, percent }) =>
-                    `${category} ${(percent * 100).toFixed(0)}%`
-                  }
-                  labelLine={false}
-                >
-                  {stats.categoryBreakdown.map((entry) => (
-                    <Cell
-                      key={entry.category}
-                      fill={CATEGORY_COLORS[entry.category] || "#6b7280"}
-                    />
-                  ))}
-                </Pie>
-                <Tooltip
-                  formatter={(value) => formatCurrency(value)}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+      <div className="od-grid chart-grid" style={{ marginTop: 20 }}>
+        <div className="card">
+          <h3 className="card__title">Category Breakdown</h3>
+          {filteredBreakdown.length > 0 ? (
+            <>
+              <Donut
+                segments={filteredBreakdown.map((b) => ({
+                  label: b.category,
+                  value: b.total,
+                  color: catColor(b.category),
+                }))}
+              />
+              <Legend
+                rows={filteredBreakdown.slice(0, 8).map((b) => ({
+                  name: b.category,
+                  value: b.total,
+                  color: catColor(b.category),
+                }))}
+              />
+            </>
           ) : (
-            <div className="flex items-center justify-center h-[300px] text-gray-400">
-              No data to display
-            </div>
+            <p className="empty__text" style={{ textAlign: "center" }}>No data to display</p>
           )}
         </div>
 
-        {/* Bar Chart - Monthly Trend */}
-        <div className="card p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            Monthly Trend
-          </h3>
-          {stats?.monthlyTrend?.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={stats.monthlyTrend}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis
-                  dataKey="month"
-                  tick={{ fontSize: 12 }}
-                  tickFormatter={(v) => {
-                    const [y, m] = v.split("-");
-                    return new Date(y, m - 1).toLocaleString("en", {
-                      month: "short",
-                    });
-                  }}
-                />
-                <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip
-                  formatter={(value) => formatCurrency(value)}
-                  labelFormatter={(label) => {
-                    const [y, m] = label.split("-");
-                    return new Date(y, m - 1).toLocaleString("en", {
-                      month: "long",
-                      year: "numeric",
-                    });
-                  }}
-                />
-                <Bar dataKey="total" fill="#16a34a" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex items-center justify-center h-[300px] text-gray-400">
-              No data to display
-            </div>
-          )}
+        <div className="card">
+          <h3 className="card__title">Monthly Trend</h3>
+          <Bars data={trend} />
         </div>
       </div>
 
-      {/* Category Breakdown Table */}
-      {stats?.categoryBreakdown?.length > 0 && (
-        <div className="card overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Spending by Category
-            </h3>
+      {/* Spending by Category list */}
+      {filteredBreakdown.length > 0 ? (
+        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+          <div style={{ padding: "16px 16px 4px" }}>
+            <h3 className="card__title" style={{ margin: 0 }}>Spending by Category</h3>
           </div>
-          <div className="divide-y divide-gray-100">
-            {stats.categoryBreakdown.map((cat) => {
-              const pct =
-                stats.totalSpend > 0
-                  ? ((cat.total / stats.totalSpend) * 100).toFixed(1)
-                  : 0;
+          <div className="list" style={{ border: "none", boxShadow: "none", borderRadius: 0 }}>
+            {filteredBreakdown.map((b) => {
+              const pct = totalSpend > 0 ? ((b.total / totalSpend) * 100).toFixed(1) : "0";
               return (
-                <div
-                  key={cat.category}
-                  className="flex items-center justify-between px-6 py-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-xl">
-                      {CATEGORY_ICONS[cat.category]}
-                    </span>
-                    <div>
-                      <p className="font-medium text-gray-900">
-                        {cat.category}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {cat.count} transactions
-                      </p>
-                    </div>
+                <div className="list__row" key={b.category}>
+                  <span className="row-icon" style={{ background: catColor(b.category) + "33" }} aria-hidden="true">{catIcon(b.category)}</span>
+                  <div className="row-main od-field">
+                    <span className="row-name od-truncate">{b.category}</span>
+                    <span className="screen-sub">{b.count} transaction{b.count !== 1 ? "s" : ""}</span>
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-gray-900">
-                      {formatCurrency(cat.total)}
-                    </p>
-                    <p className="text-sm text-gray-500">{pct}%</p>
+                  <div style={{ textAlign: "right" }}>
+                    <span className="row-amt od-nowrap">{formatCurrency(b.total)}</span>
+                    <span className="screen-sub od-nowrap">{pct}%</span>
                   </div>
                 </div>
               );
             })}
           </div>
         </div>
+      ) : (
+        <div style={{ marginTop: 20 }}>
+          <EmptyState emoji="🪙" title="No expenses yet" text="Add your first expense to make the chart go brrr." />
+        </div>
       )}
-    </div>
-  );
-}
 
-function StatCard({ label, value, icon, color }) {
-  return (
-    <div className="card p-4">
-      <div className="flex items-center gap-3">
-        <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl ${color}`}>
-          {icon}
-        </div>
-        <div>
-          <p className="text-sm text-gray-500">{label}</p>
-          <p className="text-lg font-bold text-gray-900">{value}</p>
-        </div>
-      </div>
+      {stats?.categoryBreakdown?.some((b) => !categories.some((c) => c.name === b.category)) && (
+        <p className="tiny-note">
+          Some expenses reference categories that no longer exist.
+        </p>
+      )}
+
+      <Wave />
     </div>
   );
 }

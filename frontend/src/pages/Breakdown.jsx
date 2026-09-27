@@ -1,12 +1,15 @@
 import { useState, useEffect } from "react";
-import {
-  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Legend,
-} from "recharts";
 import { fetchBreakdown, fetchCategories } from "../api.js";
+import { formatCurrency, formatDate, PERIODS } from "../constants.js";
 import {
-  formatCurrency, formatDate, CATEGORY_COLORS, PERIODS,
-} from "../constants.js";
+  Donut, Bars, Legend, ScreenHead, EmptyState, Loading,
+  catColor, catIcon,
+} from "../components/retro.jsx";
+
+const ITEM_PALETTE = [
+  "#ef4444", "#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899",
+  "#06b6d4", "#f97316", "#14b8a6", "#84cc16", "#6366f1", "#6b7280",
+];
 
 export default function Breakdown() {
   const [categories, setCategories] = useState([]);
@@ -19,6 +22,16 @@ export default function Breakdown() {
 
   useEffect(() => {
     fetchCategories().then(setCategories).catch(() => {});
+  }, []);
+
+  // Refresh when categories change (e.g. after a delete on Categories tab)
+  useEffect(() => {
+    const handler = () => {
+      fetchCategories().then(setCategories).catch(() => {});
+      loadBreakdown();
+    };
+    window.addEventListener("categoriesChanged", handler);
+    return () => window.removeEventListener("categoriesChanged", handler);
   }, []);
 
   useEffect(() => {
@@ -42,216 +55,128 @@ export default function Breakdown() {
     }
   };
 
-  // Pick a random selected category's color or use blue
-  const getColor = (cat) => CATEGORY_COLORS[cat] || "#3b82f6";
-
-  // Flatten items from breakdown for the selected category
-  const selectedCatData = data.breakdown.find(
-    (b) => b.category === selectedCategory
-  );
-  const itemChartData = selectedCatData
-    ? selectedCatData.items.map((item) => ({
-        name: item.itemType,
-        value: item.totalAmount,
-        frequency: item.frequency,
-      }))
-    : [];
-
-  // Category-level pie chart (all categories)
-  const categoryPieData = data.breakdown.map((b) => ({
-    name: b.category,
+  const segs = data.breakdown.map((b) => ({
+    label: b.category,
     value: b.categoryTotal,
-    count: b.categoryCount,
+    color: catColor(b.category),
   }));
 
+  const trendData = data.trend.map((t) => ({ label: t.period, value: t.total }));
+
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-900">Category Breakdown</h2>
+    <div>
+      <ScreenHead title="Category Breakdown" sub="Zoom all the way into your pennies." />
 
       {/* Filters */}
-      <div className="card p-4">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-end">
-          <div>
-            <label className="label">Category</label>
-            <select
-              className="input"
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-            >
+      <div className="card card--flat">
+        <span className="sticker" aria-hidden="true" style={{ display: "grid", placeItems: "center", fontSize: 24 }}>📊</span>
+        <div className="od-grid filter-grid">
+          <div className="od-field">
+            <label className="field-label" htmlFor="bdCat">Category</label>
+            <select id="bdCat" className="input" value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
               <option value="">All Categories</option>
               {categories.map((c) => (
-                <option key={c.id} value={c.name}>
-                  {c.icon} {c.name}
-                </option>
+                <option key={c.id} value={c.name}>{c.icon} {c.name}</option>
               ))}
             </select>
           </div>
-          <div>
-            <label className="label">Period</label>
-            <select
-              className="input"
-              value={period}
-              onChange={(e) => setPeriod(e.target.value)}
-            >
+          <div className="od-field">
+            <label className="field-label" htmlFor="bdPeriod">Period</label>
+            <select id="bdPeriod" className="input" value={period} onChange={(e) => setPeriod(e.target.value)}>
               {PERIODS.map((p) => (
-                <option key={p.value} value={p.value}>
-                  {p.label}
-                </option>
+                <option key={p.value} value={p.value}>{p.label}</option>
               ))}
             </select>
           </div>
-          <div>
-            <label className="label">From</label>
-            <input
-              type="date"
-              className="input"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-            />
+          <div className="od-field">
+            <label className="field-label" htmlFor="bdStart">From</label>
+            <input id="bdStart" className="input" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
           </div>
-          <div>
-            <label className="label">To</label>
-            <input
-              type="date"
-              className="input"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-            />
+          <div className="od-field">
+            <label className="field-label" htmlFor="bdEnd">To</label>
+            <input id="bdEnd" className="input" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
           </div>
         </div>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="text-gray-500 flex items-center gap-2">
-            <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            Loading breakdown...
-          </div>
+        <div style={{ marginTop: 20 }}>
+          <Loading label="Loading breakdown..." />
         </div>
       ) : data.breakdown.length === 0 ? (
-        <div className="card p-12 text-center">
-          <div className="text-4xl mb-3">📊</div>
-          <p className="text-gray-500 font-medium">No data to display</p>
-          <p className="text-sm text-gray-400 mt-1">Add some expenses to see breakdowns</p>
+        <div style={{ marginTop: 20 }}>
+          <EmptyState emoji="📊" title="No data to display" text="Add some expenses to see breakdowns." />
         </div>
       ) : (
-        <div className="space-y-6">
-          {/* Category Pie Chart */}
-          <div className="card p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Spending by Category
-            </h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={categoryPieData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={100}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  labelLine={false}
-                >
-                  {categoryPieData.map((entry) => (
-                    <Cell key={entry.name} fill={getColor(entry.name)} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => formatCurrency(value)} />
-              </PieChart>
-            </ResponsiveContainer>
+        <div className="od-stack" style={{ "--od-gap": "20px", marginTop: 20 }}>
+          {/* Category donut */}
+          <div className="card">
+            <h3 className="card__title">Spending by Category</h3>
+            <Donut segments={segs} />
+            <Legend rows={segs} />
           </div>
 
-          {/* Trend Chart (when category selected) */}
-          {selectedCategory && data.trend.length > 0 && (
-            <div className="card p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                {selectedCategory} — Trend ({period})
-              </h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={data.trend}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="period" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} />
-                  <Tooltip formatter={(value) => formatCurrency(value)} />
-                  <Bar dataKey="total" fill={getColor(selectedCategory)} radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+          {/* Trend (when category selected) */}
+          {selectedCategory && trendData.length > 0 && (
+            <div className="card">
+              <h3 className="card__title">{selectedCategory} — Trend ({period})</h3>
+              <Bars data={trendData} />
             </div>
           )}
 
-          {/* Item Breakdown Table */}
+          {/* Category blocks */}
           {data.breakdown.map((catData) => (
             <div
               key={catData.category}
-              className={`card overflow-hidden ${
-                selectedCategory && catData.category !== selectedCategory
-                  ? "opacity-50"
-                  : ""
-              }`}
+              className="card"
+              style={{
+                padding: 0,
+                overflow: "hidden",
+                opacity: selectedCategory && catData.category !== selectedCategory ? 0.5 : 1,
+              }}
             >
-              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">{CATEGORY_COLORS[catData.category] ? "📊" : "📦"}</span>
-                  <h3 className="font-semibold text-gray-900">{catData.category}</h3>
-                </div>
-                <div className="text-right">
-                  <p className="font-bold text-gray-900">{formatCurrency(catData.categoryTotal)}</p>
-                  <p className="text-xs text-gray-500">{catData.categoryCount} transactions</p>
+              <div style={{ padding: 16 }}>
+                <div className="od-row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
+                  <div className="od-row">
+                    <span className="row-icon" style={{ background: catColor(catData.category) + "33" }} aria-hidden="true">
+                      {catIcon(catData.category)}
+                    </span>
+                    <span className="cat-card__name">{catData.category}</span>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <span className="row-amt od-nowrap">{formatCurrency(catData.categoryTotal)}</span>
+                    <span className="screen-sub od-nowrap">{catData.categoryCount} transactions</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Items within this category */}
-              <div className="divide-y divide-gray-50">
+              <div className="list" style={{ border: "none", borderTop: "3px dashed #d9d9e6", boxShadow: "none", borderRadius: 0 }}>
                 {catData.items.map((item) => (
-                  <div
-                    key={item.itemType}
-                    className="flex items-center justify-between px-6 py-3 hover:bg-gray-50"
-                  >
-                    <div>
-                      <p className="font-medium text-gray-800">{item.itemType}</p>
-                      <p className="text-xs text-gray-500">
-                        Bought {item.frequency} time{item.frequency !== 1 ? "s" : ""} · Avg {formatCurrency(item.avgAmount)}
-                      </p>
+                  <div className="list__row" key={item.itemType}>
+                    <div className="row-main od-field">
+                      <span className="row-name od-truncate">{item.itemType}</span>
+                      <span className="screen-sub">
+                        Bought {item.frequency}× · Avg {formatCurrency(item.avgAmount)}
+                      </span>
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-gray-900">{formatCurrency(item.totalAmount)}</p>
-                      <p className="text-xs text-gray-400">Last: {formatDate(item.lastPurchase)}</p>
+                    <div style={{ textAlign: "right" }}>
+                      <span className="row-amt od-nowrap">{formatCurrency(item.totalAmount)}</span>
+                      <span className="screen-sub od-nowrap">Last: {formatDate(item.lastPurchase)}</span>
                     </div>
                   </div>
                 ))}
               </div>
 
-              {/* Item Pie Chart (when this category is selected) */}
+              {/* Item donut for the selected category */}
               {selectedCategory === catData.category && catData.items.length > 1 && (
-                <div className="px-6 pb-6 pt-2">
-                  <ResponsiveContainer width="100%" height={250}>
-                    <PieChart>
-                      <Pie
-                        data={itemChartData}
-                        dataKey="value"
-                        nameKey="name"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={85}
-                        label={({ name, percent }) =>
-                          percent > 0.05 ? `${name} ${(percent * 100).toFixed(0)}%` : ""
-                        }
-                        labelLine={false}
-                      >
-                        {itemChartData.map((entry, idx) => (
-                          <Cell
-                            key={entry.name}
-                            fill={["#ef4444","#3b82f6","#10b981","#f59e0b","#8b5cf6","#ec4899","#06b6d4","#f97316","#14b8a6","#84cc16","#6366f1","#6b7280"][idx % 12]}
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value) => formatCurrency(value)} />
-                    </PieChart>
-                  </ResponsiveContainer>
+                <div className="donut" style={{ marginTop: 12, padding: "0 16px 16px" }}>
+                  <Donut
+                    segments={catData.items.map((it, idx) => ({
+                      label: it.itemType,
+                      value: it.totalAmount,
+                      color: ITEM_PALETTE[idx % ITEM_PALETTE.length],
+                    }))}
+                  />
                 </div>
               )}
             </div>
