@@ -92,40 +92,38 @@
       animation-iteration-count: 1 !important;
       transition-duration: 0.001ms !important;
     }
-    .ticker__track {
+    .tagline__track {
       animation: none !important;
-      padding-left: 16px;
+      padding-left: 12px;
     }
   }
 }
 
 @layer components {
-  /* ---------- Chaotic outer chrome ---------- */
-  .ticker {
+  /* ---------- Floating tagline ticker ---------- */
+  .tagline {
     background: var(--yellow);
     color: var(--ink);
     border-bottom: var(--line) solid var(--ink);
     overflow: hidden;
     white-space: nowrap;
+    font-family: var(--font-display);
     font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    font-size: 15px;
-    padding: 8px 0;
+    letter-spacing: 0.02em;
+    font-size: clamp(10px, 1.15vw, 13px);
+    padding-top: max(6px, env(safe-area-inset-top, 0px));
+    padding-bottom: 6px;
   }
-  .ticker__track {
-    display: inline-block;
-    padding-left: 100%;
-    animation: marquee 26s linear infinite;
+  .tagline__track {
+    display: inline-flex;
+    width: max-content;
+    animation: tagline-marquee 30s linear infinite;
   }
-  .ticker__track span {
-    padding: 0 24px;
+  .tagline__track span {
+    padding: 0 28px;
   }
-  .ticker__track b {
-    color: var(--pink);
-  }
-  @keyframes marquee {
-    from { transform: translateX(0); }
+  @keyframes tagline-marquee {
+    from { transform: translateX(100vw); }
     to { transform: translateX(-100%); }
   }
 
@@ -238,7 +236,8 @@
     z-index: 50;
     background: var(--paper);
     border-top: var(--line) solid var(--ink);
-    padding-bottom: env(safe-area-inset-bottom, 0);
+    padding-bottom: max(8px, env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
   }
   .bottom-nav__in {
     display: flex;
@@ -464,6 +463,122 @@
     color: #fff;
   }
 
+  /* ---------- Sound controls (volume slider + mute) ---------- */
+  .sound-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 4px;
+  }
+  .volume-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 92px;
+    height: 12px;
+    border: 3px solid var(--ink);
+    border-radius: 999px;
+    background: linear-gradient(
+      to right,
+      var(--cyan) 0%,
+      var(--cyan) var(--vol, 100%),
+      var(--paper) var(--vol, 100%),
+      var(--paper) 100%
+    );
+    cursor: pointer;
+    padding: 0;
+    margin: 0;
+  }
+  /* Percentage bubble — appears above the thumb while dragging (pointer
+     or keyboard focus). --pct is 0-100; the calc maps it onto the thumb's
+     actual travel range (track inner width minus thumb width). */
+  .volume-wrap {
+    position: relative;
+    display: flex;
+  }
+  .volume-bubble {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    transform: translateX(-50%);
+    left: calc(var(--pct, 50) * 0.64% + 11px);
+    background: var(--ink);
+    color: #fff;
+    font-weight: 700;
+    font-size: 13px;
+    line-height: 1;
+    padding: 5px 9px;
+    border-radius: 8px;
+    border: 2px solid var(--ink);
+    white-space: nowrap;
+    pointer-events: none;
+    animation: bubble-pop 120ms var(--ease-out);
+    z-index: 50;
+  }
+  .volume-bubble::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: var(--ink);
+  }
+  @keyframes bubble-pop {
+    from {
+      opacity: 0;
+      transform: translateX(-50%) translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  }
+  .sound-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 4px;
+  }
+  .volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 22px;
+    height: 22px;
+    border: 3px solid var(--ink);
+    border-radius: 50%;
+    background: var(--yellow);
+    box-shadow: 2px 2px 0 var(--ink);
+    cursor: grab;
+  }
+  .volume-slider::-webkit-slider-thumb:active {
+    cursor: grabbing;
+    transform: scale(1.1);
+  }
+  .volume-slider::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+    border: 3px solid var(--ink);
+    border-radius: 50%;
+    background: var(--yellow);
+    box-shadow: 2px 2px 0 var(--ink);
+    cursor: grab;
+  }
+  .volume-slider:focus-visible {
+    outline: 3px dashed var(--pink);
+    outline-offset: 3px;
+  }
+  @media (max-width: 720px) {
+    .volume-slider {
+      width: 64px;
+    }
+    .volume-slider::-webkit-slider-thumb {
+      width: 18px;
+      height: 18px;
+    }
+    .volume-bubble {
+      left: calc(var(--pct, 50) * 0.57% + 9px);
+    }
+  }
+
   /* ---------- Form fields ---------- */
   .field-label,
   .label {
@@ -506,6 +621,22 @@
     background-size: 7px 7px, 7px 7px;
     background-repeat: no-repeat;
     padding-right: 42px;
+  }
+  input[type="date"].input {
+    appearance: none;
+    -webkit-appearance: none;
+    background-color: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 16px;
+    border: 3px solid var(--ink);
+    border-radius: var(--r);
+    padding: 12px 16px;
+    box-shadow: var(--shadow-sm);
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.8;
   }
 
   .chip {
@@ -1096,6 +1227,60 @@
     font-weight: 600;
     color: var(--muted);
     white-space: nowrap;
+  }
+  .dashboard-trend {
+    display: flex;
+    flex-direction: column;
+  }
+  .dashboard-trend .bars {
+    flex: 1 1 auto;
+    align-items: stretch;
+  }
+  .dashboard-trend .bar-track {
+    height: auto;
+    min-height: 150px;
+    flex: 1 1 auto;
+  }
+  .trend-insights {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: auto;
+    padding-top: 20px;
+  }
+  .trend-insight {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    min-width: 0;
+    min-height: 78px;
+    padding: 10px;
+    border: 2px solid var(--ink);
+    border-radius: 12px;
+    background: var(--paper);
+  }
+  .trend-insight--average {
+    background: var(--yellow);
+  }
+  .trend-insight--peak {
+    background: var(--cyan);
+  }
+  .trend-insight--change {
+    background: var(--pink);
+  }
+  .trend-insight__label,
+  .trend-insight__note {
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+  .trend-insight__value {
+    overflow-wrap: anywhere;
+    font-family: var(--font-display);
+    font-size: clamp(13px, 1.7vw, 19px);
+    line-height: 1.15;
   }
 }
 

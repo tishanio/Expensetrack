@@ -85,6 +85,8 @@ export default function Categories() {
       }
       resetForm();
       loadCategories();
+      // Notify other tabs (Dashboard, Breakdown) to refresh
+      window.dispatchEvent(new Event("categoriesChanged"));
     } catch (err) {
       toast.error(err.message || "Failed to save category");
     } finally {

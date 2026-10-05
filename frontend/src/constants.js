@@ -12,7 +12,7 @@ export const DEFAULT_CATEGORIES = [
   { name: "Stationery", icon: "📝" },
   { name: "Personal Care", icon: "💆" },
   { name: "Pets", icon: "🐾" },
-  { name: "Fitness", icon: "🏋️" },
+  { name: "Fitness", icon: "💪" },
   { name: "Subscriptions", icon: "🔁" },
   { name: "Technology", icon: "💻" },
   { name: "Finance", icon: "💳" },
@@ -62,7 +62,7 @@ export const CATEGORY_ICONS = {
   Stationery: "📝",
   "Personal Care": "💆",
   Pets: "🐾",
-  Fitness: "🏋️",
+  Fitness: "💪",
   Subscriptions: "🔁",
   Technology: "💻",
   Finance: "💳",
@@ -107,8 +107,10 @@ export function formatDate(dateStr) {
 }
 
 /**
- * Get today's date in YYYY-MM-DD format.
+ * Get today's date in YYYY-MM-DD format (local time — toISOString would
+ * return yesterday near midnight for users east of UTC).
  */
 export function today() {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }

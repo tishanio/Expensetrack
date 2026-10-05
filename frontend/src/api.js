@@ -1,4 +1,8 @@
-const API_BASE = "/api";
+const API_BASE =
+  import.meta.env.VITE_API_BASE ||
+  (typeof window !== "undefined" && (window.Capacitor?.isNativePlatform?.() || (window.location.hostname === "localhost" && !window.location.port))
+    ? "http://10.0.2.2:3001/api"
+    : "/api");
 
 async function request(url, options = {}) {
   let res;

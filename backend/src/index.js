@@ -5,6 +5,7 @@ import { seedDefaultCategories } from "./routes/categories.js";
 import expensesRouter from "./routes/expenses.js";
 import categoriesRouter from "./routes/categories.js";
 import ocrRouter from "./routes/ocr.js";
+import { warmOcrWorker, resetOcrWorker } from "./services/ocrService.js";
 import { seedDemoExpenses } from "./services/demoDataService.js";
 
 const PORT = process.env.PORT || 3001;
@@ -13,6 +14,11 @@ async function main() {
   await connectDb();
   await seedDefaultCategories();
   await seedDemoExpenses();
+
+  // Start loading the Tesseract runtime now so the first scan doesn't pay
+  // the 1-2s worker startup cost. Fire-and-forget: server accepts requests
+  // immediately and recognition calls await the same in-flight creation.
+  warmOcrWorker();
 
   const app = express();
   app.use(cors());
@@ -36,8 +42,16 @@ async function main() {
   });
 }
 
-process.on("SIGINT", async () => { await closeDb(); process.exit(0); });
-process.on("SIGTERM", async () => { await closeDb(); process.exit(0); });
+process.on("SIGINT", async () => {
+  await resetOcrWorker();
+  await closeDb();
+  process.exit(0);
+});
+process.on("SIGTERM", async () => {
+  await resetOcrWorker();
+  await closeDb();
+  process.exit(0);
+});
 
 main().catch((err) => {
   console.error("Failed to start server:", err);

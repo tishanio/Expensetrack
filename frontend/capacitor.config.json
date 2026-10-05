@@ -1,0 +1,9 @@
+{
+  "appId": "com.expensesnap.app",
+  "appName": "ExpenseSnap",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "http",
+    "cleartext": true
+  }
+}

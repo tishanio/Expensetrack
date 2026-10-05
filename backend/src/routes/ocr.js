@@ -1,6 +1,6 @@
 import { Router } from "express";
 import multer from "multer";
-import { extractTextFromImage } from "../services/ocrService.js";
+import { extractTextFromImage, preprocessImage } from "../services/ocrService.js";
 import { parseOcrText } from "../services/parseService.js";
 import { categorizeExpense } from "../services/categorizeService.js";
 
@@ -62,6 +62,49 @@ router.post("/extract", upload.single("receipt"), async (req, res) => {
     res.status(500).json({
       error: "Failed to process image. Please try again with a clearer image.",
     });
+  }
+});
+
+/**
+ * POST /api/ocr/preprocess-debug
+ * Debug utility: runs ONLY the preprocessing step (resize/greyscale/contrast)
+ * and returns the resulting image as binary JPEG so you can eyeball exactly
+ * what Tesseract sees.
+ *
+ * Body: multipart/form-data with 'receipt' field
+ * Query params (all optional):
+ *   ?maxEdge=1800   longest-edge cap in px (200-4000)
+ *   ?greyscale=true/false
+ *   ?contrast=0.5   -1..1
+ *   ?quality=85     JPEG quality 10-100
+ *
+ * Preprocessing stats come back in the X-OCR-Preprocess-Meta response header.
+ * Example:
+ *   curl -F receipt=@receipt.jpg "http://localhost:3001/api/ocr/preprocess-debug?contrast=0.3" -o debug.jpg -D -
+ */
+router.post("/preprocess-debug", upload.single("receipt"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No image file provided" });
+    }
+
+    const opts = {
+      maxEdge: req.query.maxEdge,
+      greyscale: req.query.greyscale,
+      contrast: req.query.contrast,
+      quality: req.query.quality,
+    };
+
+    const { buffer, meta } = await preprocessImage(req.file.buffer, opts);
+
+    res.set("Content-Type", "image/jpeg");
+    res.set("Content-Disposition", 'inline; filename="preprocessed.jpg"');
+    res.set("X-OCR-Preprocess-Meta", JSON.stringify(meta));
+    res.set("Access-Control-Expose-Headers", "X-OCR-Preprocess-Meta");
+    res.send(buffer);
+  } catch (err) {
+    console.error("Preprocess debug error:", err);
+    res.status(500).json({ error: "Failed to preprocess image." });
   }
 });
 

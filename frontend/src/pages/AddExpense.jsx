@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "../sounds.js";
 import { createExpense, fetchCategories, searchItems } from "../api.js";
 import { today } from "../constants.js";
-import { ScreenHead } from "../components/retro.jsx";
+import { ScreenHead, catIcon } from "../components/retro.jsx";
 
 export default function AddExpense() {
   const navigate = useNavigate();
@@ -147,7 +147,7 @@ export default function AddExpense() {
                   aria-pressed={form.category === cat.name}
                   onClick={() => pickCategory(cat.name)}
                 >
-                  {cat.icon} {cat.name}
+                  {!cat.icon || cat.icon.includes("?") ? catIcon(cat.name) : cat.icon} {cat.name}
                 </button>
               ))}
             </div>

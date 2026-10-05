@@ -59,6 +59,17 @@ export default function Dashboard() {
     const label = new Date(y, mo - 1).toLocaleString("en", { month: "short", year: "2-digit" });
     return { label, value: m.total };
   });
+  const trendTotal = trend.reduce((sum, month) => sum + month.value, 0);
+  const averageMonthlySpend = trend.length ? trendTotal / trend.length : 0;
+  const peakMonth = trend.reduce(
+    (peak, month) => (month.value > peak.value ? month : peak),
+    trend[0]
+  );
+  const previousMonth = trend.at(-2);
+  const latestMonth = trend.at(-1);
+  const latestChange = previousMonth && previousMonth.value > 0
+    ? ((latestMonth.value - previousMonth.value) / previousMonth.value) * 100
+    : null;
 
   const statCards = [
     { label: "Total Spend", value: formatCurrency(totalSpend), icon: "💰", bg: "var(--yellow)" },
@@ -88,17 +99,16 @@ export default function Dashboard() {
             <label className="field-label" htmlFor="dashEnd">To</label>
             <input id="dashEnd" className="input" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
           </div>
-          {(startDate || endDate) && (
-            <div className="od-field" style={{ alignSelf: "end" }}>
-              <button
-                type="button"
-                className="btn btn--ghost btn--block"
-                onClick={() => { setStartDate(""); setEndDate(""); }}
-              >
-                Clear Filters
-              </button>
-            </div>
-          )}
+          <div className="od-field" style={{ alignSelf: "end" }}>
+            <button
+              type="button"
+              className="btn btn--ghost btn--block"
+              disabled={!startDate && !endDate}
+              onClick={() => { setStartDate(""); setEndDate(""); }}
+            >
+              Clear Filters
+            </button>
+          </div>
         </div>
       </div>
 
@@ -143,9 +153,31 @@ export default function Dashboard() {
           )}
         </div>
 
-        <div className="card">
+        <div className="card dashboard-trend">
           <h3 className="card__title">Monthly Trend</h3>
           <Bars data={trend} />
+          {trend.length > 0 && (
+            <div className="trend-insights" aria-label="Monthly trend insights">
+              <div className="trend-insight trend-insight--average">
+                <span className="trend-insight__label">Monthly average</span>
+                <strong className="trend-insight__value">{formatCurrency(averageMonthlySpend)}</strong>
+              </div>
+              <div className="trend-insight trend-insight--peak">
+                <span className="trend-insight__label">Biggest month</span>
+                <strong className="trend-insight__value">{formatCurrency(peakMonth.value)}</strong>
+                <span className="trend-insight__note">{peakMonth.label}</span>
+              </div>
+              <div className="trend-insight trend-insight--change">
+                <span className="trend-insight__label">Latest change</span>
+                <strong className="trend-insight__value">
+                  {latestChange === null ? "—" : `${latestChange > 0 ? "+" : ""}${latestChange.toFixed(0)}%`}
+                </strong>
+                <span className="trend-insight__note">
+                  {latestMonth.label}{previousMonth ? ` vs ${previousMonth.label}` : ""}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

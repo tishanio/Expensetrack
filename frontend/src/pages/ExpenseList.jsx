@@ -6,6 +6,7 @@ import {
   deleteExpense,
   fetchCategories,
 } from "../api.js";
+import { exportExpensesCsv } from "../csv.js";
 import { formatCurrency, formatDate } from "../constants.js";
 import { ScreenHead, EmptyState, Loading, catColor, catIcon } from "../components/retro.jsx";
 
@@ -139,18 +140,34 @@ export default function ExpenseList() {
 
   const hasFilters = category || startDate || endDate || source;
 
-  // Get items for the edit form's selected category
-  const editCatItems =
-    categories.find((c) => c.name === editForm.category)?.items || [];
+  // Get items for the edit form's selected category, keeping the expense's
+  // current item_type selectable even when it isn't in the category list.
+  const editCatItems = categories.find((c) => c.name === editForm.category)?.items || [];
+  const editOptions =
+    editForm.itemType && !editCatItems.includes(editForm.itemType)
+      ? [editForm.itemType, ...editCatItems]
+      : editCatItems;
 
   return (
     <div>
       <ScreenHead
         title="All Expenses"
         extra={
-          <span className="tag" style={{ fontSize: 14, padding: "6px 12px" }}>
-            {expenses.length} expense{expenses.length !== 1 ? "s" : ""}
-          </span>
+          <div className="od-row" style={{ "--od-gap": "10px", alignItems: "center" }}>
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={() => exportExpensesCsv(expenses)}
+              disabled={expenses.length === 0}
+              title={hasFilters ? "Exports the filtered list" : "Exports all expenses"}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12m0 0l-4-4m4 4l4-4" /><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" /></svg>
+              Export CSV
+            </button>
+            <span className="tag" style={{ fontSize: 14, padding: "6px 12px" }}>
+              {expenses.length} expense{expenses.length !== 1 ? "s" : ""}
+            </span>
+          </div>
         }
       />
 
@@ -249,7 +266,7 @@ export default function ExpenseList() {
                       <label className="field-label" htmlFor="edItem">Item Type</label>
                       <select id="edItem" name="itemType" className="input" value={editForm.itemType} onChange={handleEditChange}>
                         <option value="">Select item…</option>
-                        {editCatItems.map((item) => (
+                        {editOptions.map((item) => (
                           <option key={item} value={item}>{item}</option>
                         ))}
                       </select>

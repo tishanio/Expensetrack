@@ -227,8 +227,11 @@ router.get("/search", async (req, res) => {
       return res.json([]);
     }
 
+    // Escape regex metacharacters so user input can't break (500) or
+    // manipulate the query (e.g. "samosa (2)", ".*", "a{1000000}").
+    const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const matchStage = {
-      item_type: { $regex: q, $options: "i" },
+      item_type: { $regex: escaped, $options: "i" },
     };
     if (category) matchStage.category = category;
 

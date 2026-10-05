@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { soundEnabled, setSoundEnabled, playClick, playPop, playBoing, playWhoosh } from "./sounds.js";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { soundEnabled, setSoundEnabled, playClick, playPop, playBoing, playWhoosh, userVolume, setUserVolume } from "./sounds.js";
 import { Routes, Route, NavLink, useLocation } from "react-router-dom";
 import Dashboard from "./pages/Dashboard.jsx";
 import AddExpense from "./pages/AddExpense.jsx";
@@ -60,7 +60,10 @@ const SHEET_LINKS = NAV.slice(4);
 export default function App() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [soundOn, setSoundOn] = useState(soundEnabled());
+  const [volume, setVolume] = useState(userVolume());
+  const [volumeDragging, setVolumeDragging] = useState(false);
   const location = useLocation();
+  const volumePreviewRef = useRef(0);
 
   /* Global click sounds: one delegated listener instead of per-component wiring.
      Chooses the effect from the pressed element's class; tone() is a no-op when
@@ -96,14 +99,12 @@ export default function App() {
 
   return (
     <>
-      {/* Chaotic ticker */}
-      <div className="ticker" aria-hidden="true">
-        <div className="ticker__track">
-          <span>★ fresh out of the crayon box ★</span>
-          <span><b>₹</b> ALL PRICES IN RUPEES <b>₹</b></span>
-          <span>☆ expenses, but make them LOUD ☆</span>
-          <span>★ sticker collection: <b>99</b> ★</span>
-          <span>☆ under construction forever ☆</span>
+      <div className="tagline" aria-label="Money tracking, minus the fuss. Your money, minus the mystery. Know where it goes. Track it. Spend smarter.">
+        <div className="tagline__track" aria-hidden="true">
+          <span>Money tracking, minus the fuss.</span>
+          <span>Your money, minus the mystery.</span>
+          <span>Know where it goes.</span>
+          <span>Track it. Spend smarter.</span>
         </div>
       </div>
 
@@ -119,23 +120,66 @@ export default function App() {
             <span className="brand__word">Expense<i>Snap</i></span>
           </NavLink>
 
-          {/* Sound toggle */}
-          <button
-            type="button"
-            className="icon-btn"
-            style={{ marginLeft: 4 }}
-            onClick={() => {
-              const next = !soundOn;
-              setSoundEnabled(next);
-              setSoundOn(next);
-              if (next) setTimeout(playClick, 30);
-            }}
-            aria-pressed={soundOn}
-            title={soundOn ? "Mute sounds" : "Unmute sounds"}
-            aria-label={soundOn ? "Mute sounds" : "Unmute sounds"}
-          >
-            {soundOn ? "🔊" : "🔇"}
-          </button>
+          {/* Sound toggle + volume slider */}
+          <div className="sound-controls">
+            <div
+              className="volume-wrap"
+              style={{ "--vol": `${volume}%`, "--pct": volume }}
+            >
+              {volumeDragging && (
+                <span className="volume-bubble" aria-hidden="true">
+                  {volume}%
+                </span>
+              )}
+              <input
+                type="range"
+                className="volume-slider"
+                min="0"
+                max="100"
+                step="5"
+                value={volume}
+                aria-label="Sound volume"
+                aria-valuetext={`${volume}%`}
+                title={`Volume: ${volume}%`}
+                onPointerDown={() => setVolumeDragging(true)}
+                onPointerUp={() => setVolumeDragging(false)}
+                onPointerCancel={() => setVolumeDragging(false)}
+                onFocus={() => setVolumeDragging(true)}
+                onBlur={() => setVolumeDragging(false)}
+                onChange={(e) => {
+                const v = parseInt(e.target.value, 10);
+                setVolume(v);
+                setUserVolume(v);
+                // Preview at most every 90ms while dragging; unmute when
+                // the user pushes the slider up from 0.
+                const now = Date.now();
+                if (now - volumePreviewRef.current > 90) {
+                  volumePreviewRef.current = now;
+                  if (v > 0 && !soundEnabled()) {
+                    setSoundEnabled(true);
+                    setSoundOn(true);
+                  }
+                  playClick();
+                }
+              }}
+              />
+            </div>
+            <button
+              type="button"
+              className="icon-btn"
+              onClick={() => {
+                const next = !soundOn;
+                setSoundEnabled(next);
+                setSoundOn(next);
+                if (next) setTimeout(playClick, 30);
+              }}
+              aria-pressed={soundOn}
+              title={soundOn ? "Mute sounds" : "Unmute sounds"}
+              aria-label={soundOn ? "Mute sounds" : "Unmute sounds"}
+            >
+              {volume === 0 && soundOn ? "🔇" : soundOn ? "🔊" : "🔇"}
+            </button>
+          </div>
 
           {/* Desktop nav pills */}
           <nav className="top-nav" aria-label="Primary">
@@ -183,9 +227,9 @@ export default function App() {
             </NavLink>
           ))}
           <button
-            className={"tab" + (SHEET_LINKS.some((s) => isActive(s.to)) ? " is-active" : "")}
+            className={"tab" + (moreOpen || SHEET_LINKS.some((s) => isActive(s.to)) ? " is-active" : "")}
             type="button"
-            onClick={() => setMoreOpen(true)}
+            onClick={() => setMoreOpen((p) => !p)}
             aria-haspopup="dialog"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>

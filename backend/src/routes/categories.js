@@ -73,7 +73,7 @@ const DEFAULT_CATEGORIES = [
   },
   {
     name: "Fitness",
-    icon: "🏋️",
+    icon: "💪",
     items: ["Gym Membership", "Sports Gear", "Yoga", "Trainer", "Other"],
   },
   {
@@ -128,8 +128,9 @@ export async function seedDefaultCategories() {
     updateOne: {
       filter: { name: category.name },
       update: {
+        $set: { icon: category.icon, items: category.items },
         $setOnInsert: {
-          ...category,
+          name: category.name,
           isDefault: true,
           created_at: now,
         },

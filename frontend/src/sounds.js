@@ -4,6 +4,35 @@ import rawToast from "react-hot-toast";
 
 let ctx = null;
 
+/* Phone speakers are far quieter than desktop/laptop audio, so the same
+   gain levels read as inaudible on Android. Detect once at load and boost
+   there, keeping the browser tuning subtle. */
+const NATIVE_BOOST = 2.2;
+const isNative =
+  typeof window !== "undefined" && !!window.Capacitor?.isNativePlatform?.();
+
+/* User-adjustable master volume (0-100), persisted alongside the mute
+   flag. Applied on top of each effect's base vol — 100 keeps the tuning
+   above untouched. */
+const VOLUME_KEY = "expensesnap-volume";
+
+export function userVolume() {
+  try {
+    const raw = parseInt(localStorage.getItem(VOLUME_KEY), 10);
+    return Number.isFinite(raw) && raw >= 0 && raw <= 100 ? raw : 100;
+  } catch {
+    return 100;
+  }
+}
+
+export function setUserVolume(pct) {
+  try {
+    localStorage.setItem(VOLUME_KEY, String(Math.round(Math.min(100, Math.max(0, pct)))));
+  } catch {
+    /* private mode — ignore */
+  }
+}
+
 function ac() {
   if (typeof window === "undefined") return null;
   if (!ctx) {
@@ -40,12 +69,15 @@ function tone({ freq = 440, end = null, type = "sine", dur = 0.12, vol = 0.12, d
   const osc = audio.createOscillator();
   const gain = audio.createGain();
 
+  const platformBoost = isNative ? NATIVE_BOOST : 1;
+  const level = Math.min(1, vol * platformBoost * (userVolume() / 100));
+
   osc.type = type;
   osc.frequency.setValueAtTime(freq, t0);
   if (end) osc.frequency.exponentialRampToValueAtTime(end, t0 + dur);
 
   gain.gain.setValueAtTime(0.0001, t0);
-  gain.gain.exponentialRampToValueAtTime(vol, t0 + attack);
+  gain.gain.exponentialRampToValueAtTime(level, t0 + attack);
   gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
 
   osc.connect(gain).connect(audio.destination);
@@ -53,8 +85,9 @@ function tone({ freq = 440, end = null, type = "sine", dur = 0.12, vol = 0.12, d
   osc.stop(t0 + dur + 0.05);
 }
 
-/* ── Named effects — tuned "subtle & soft": pure sine/triangle timbres,
-   gentle attack ramps, relaxed timing, no harsh overtones ────────── */
+/* ── Named effects — tuned "subtle & soft" for desktop audio. On native
+   (Android) every vol is multiplied by NATIVE_BOOST in tone() so the small
+   speaker keeps up. Pure sine/triangle timbres, gentle attack ramps. ── */
 
 /** Soft tick for chips, tabs, icon buttons. */
 export function playClick() {
@@ -88,6 +121,18 @@ export function playBoing() {
 export function playWhoosh() {
   tone({ freq: 240, end: 460, type: "sine", dur: 0.22, vol: 0.045, attack: 0.02 });
   tone({ freq: 360, end: 690, type: "sine", dur: 0.18, vol: 0.03, attack: 0.02, delay: 0.05 });
+}
+
+/* ── Test hook: lets e2e tooling trigger effects directly and inspect
+   the synth engine. Harmless in production. ────────────────── */
+if (typeof window !== "undefined") {
+  window.__playSound = (name) => {
+    const map = { click: playClick, pop: playPop, success: playSuccess, error: playError, boing: playBoing, whoosh: playWhoosh };
+    const fn = map[name];
+    if (!fn) throw new Error(`Unknown sound: ${name}`);
+    fn();
+    return { played: name, muted: !soundEnabled(), native: isNative, boost: isNative ? NATIVE_BOOST : 1, volume: userVolume() };
+  };
 }
 
 /* ── Toast proxy: same API as react-hot-toast, but musical ────────── */
